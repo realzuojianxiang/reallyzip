@@ -1,6 +1,15 @@
 # RustZip
 
+[![Release](https://img.shields.io/github/v/release/realzuojianxiang/rustzip?label=release)](https://github.com/realzuojianxiang/rustzip/releases/latest)
+[![License](https://img.shields.io/github/license/realzuojianxiang/rustzip)](LICENSE)
+
 用 Rust + egui 编写的图形化压缩 / 解压工具，参考 WinRAR 的体验。现代 Fluent 风格界面，支持 ZIP 的创建、解压、加密、分卷、包内浏览等完整能力。
+
+## 📦 下载
+
+**[⬇️ 下载最新版 rustzip.exe](https://github.com/realzuojianxiang/rustzip/releases/latest/download/rustzip-v0.1.0-windows-x64.exe)** · Windows 10/11 x64 · 6.5 MB
+
+单文件绿色运行，无需安装、无运行时依赖。其他版本见 [Releases](https://github.com/realzuojianxiang/rustzip/releases)。
 
 ## ✨ 功能特性
 
