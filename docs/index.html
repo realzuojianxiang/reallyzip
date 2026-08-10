@@ -91,6 +91,24 @@
   .step h3{margin:0 0 6px; font-size:16px}
   .step p{margin:0; color:var(--muted); font-size:14px}
   .step code{background:#f1f2f7; border:1px solid var(--line); border-radius:6px; padding:1px 6px; font-size:13px; color:#334}
+  /* docs */
+  .doc-grid{display:grid; grid-template-columns:1.05fr .95fr; gap:18px}
+  @media (max-width:760px){.doc-grid{grid-template-columns:1fr}}
+  .panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:22px; box-shadow:var(--shadow)}
+  .panel h3{margin:0 0 12px; font-size:16px}
+  ul.flist{list-style:none; margin:0; padding:0; display:grid; gap:9px}
+  ul.flist li{display:flex; gap:9px; font-size:14.5px; color:#334}
+  ul.flist li svg{flex:0 0 auto; width:17px; height:17px; color:var(--ok); margin-top:3px}
+  .cmds{background:#0f172a; color:#e2e8f0; border-radius:12px; padding:16px 18px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13px; line-height:1.95; overflow-x:auto}
+  .cmds .c{color:#94a3b8}
+  .cmds .f{color:#c4b5fd}
+  .tbl{width:100%; border-collapse:collapse; font-size:14px}
+  .tbl th,.tbl td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--line)}
+  .tbl th{color:var(--muted); font-weight:600; font-size:13px}
+  .tbl td code{background:#f1f2f7; border:1px solid var(--line); border-radius:6px; padding:1px 6px; font-size:13px}
+  .road{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px}
+  .road span{font-size:13px; background:var(--brand-soft); color:var(--brand); border:1px solid #dfe1fd; padding:4px 10px; border-radius:999px}
   footer{border-top:1px solid var(--line); padding:30px 0; color:var(--muted); font-size:13.5px}
   .foot-inner{display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap}
   .foot-inner a:hover{color:var(--ink)}
@@ -111,6 +129,7 @@
       <a href="#menu">右键菜单</a>
       <a href="#download">下载</a>
       <a href="#usage">使用</a>
+      <a href="#docs">文档</a>
     </nav>
     <a class="gh" href="https://github.com/realzuojianxiang/reallyzip" target="_blank" rel="noopener">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
@@ -255,6 +274,58 @@
       <div class="n">3</div>
       <h3>右键即用</h3>
       <p>在文件 / 文件夹 / .zip 上右键，选择压缩、解压或追加，弹窗少、效率高。</p>
+    </div>
+  </div>
+</section>
+
+<section class="block wrap" id="docs" style="padding-top:0">
+  <div class="sec-head">
+    <h2>文档与参考</h2>
+    <p>完整功能、命令行用法与技术栈，一页看完。</p>
+  </div>
+  <div class="doc-grid">
+    <div class="panel">
+      <h3>功能特性（完整）</h3>
+      <ul class="flist">
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 创建 / 解压 ZIP，六档压缩级别（存储 ~ 最大压缩）</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> AES-256 加密：密码加密与解密</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 分卷压缩 <code>.zip.001 / .002…</code>（与 7-Zip 兼容），打开自动合并</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 包内浏览：不解压查看目录树，预览文本 / 二进制</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 追加与删除：向已有压缩包追加（跳同名）、删除条目（无损重写）</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 完整性测试：逐条校验 CRC32</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 右键级联菜单（HKCU，无需管理员、无需 COM）</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 拖拽压缩：把文件拖进窗口即可压缩</li>
+      </ul>
+      <h3 style="margin-top:20px">技术栈</h3>
+      <table class="tbl">
+        <tr><th>组件</th><th>说明</th></tr>
+        <tr><td><code>eframe / egui 0.35</code></td><td>即时模式 GUI 框架</td></tr>
+        <tr><td><code>zip 8.6</code></td><td>Deflate / AES-256 引擎</td></tr>
+        <tr><td><code>rfd</code></td><td>原生文件对话框</td></tr>
+        <tr><td><code>winreg</code></td><td>Windows 注册表（右键菜单）</td></tr>
+      </table>
+      <p style="margin:16px 0 0;font-size:13px;color:var(--muted)">更多架构与构建细节见 <a href="https://github.com/realzuojianxiang/reallyzip/blob/master/DEVELOPMENT.md" target="_blank" rel="noopener" style="color:var(--brand)">DEVELOPMENT.md</a></p>
+    </div>
+    <div class="panel">
+      <h3>命令行参考</h3>
+      <div class="cmds">
+<span class="c"># 右键菜单</span><br>
+<span class="f">reallyzip</span> --register-shell<br>
+<span class="f">reallyzip</span> --unregister-shell<br>
+<span class="c"># 压缩 / 解压</span><br>
+<span class="f">reallyzip</span> --compress "文件1" "文件2"<br>
+<span class="f">reallyzip</span> --compress-here "文件1"<br>
+<span class="f">reallyzip</span> --extract-to "a.zip"<br>
+<span class="f">reallyzip</span> --extract-here "a.zip"<br>
+<span class="f">reallyzip</span> "a.zip"
+      </div>
+      <h3 style="margin-top:20px">构建</h3>
+      <div class="cmds">cargo build --release <span class="c"># 产物 target/release/reallyzip.exe</span></div>
+      <h3 style="margin-top:20px">路线图</h3>
+      <div class="road">
+        <span>深色模式</span><span>7z / tar / gz</span><span>包内拖拽排序</span><span>批量重命名</span>
+      </div>
+      <p style="margin:16px 0 0;font-size:13px;color:var(--muted)">许可证：MIT · 详见 <a href="https://github.com/realzuojianxiang/reallyzip/blob/master/LICENSE" target="_blank" rel="noopener" style="color:var(--brand)">LICENSE</a></p>
     </div>
   </div>
 </section>
