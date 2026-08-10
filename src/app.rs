@@ -169,7 +169,7 @@ struct Preview {
 
 // ------------------------------------------------------------------ App
 
-pub struct RustRarApp {
+pub struct RustZipApp {
     cwd: PathBuf, // 空路径表示“此电脑”
     archive: Option<OpenArchive>,
     inner: String,
@@ -201,7 +201,7 @@ pub struct RustRarApp {
     startup: Option<Startup>,
 }
 
-impl RustRarApp {
+impl RustZipApp {
     pub fn new(startup: Startup) -> Self {
         let home = home_dir();
         Self {
@@ -1061,7 +1061,7 @@ impl RustRarApp {
 
 // ------------------------------------------------------------------ 绘制
 
-impl eframe::App for RustRarApp {
+impl eframe::App for RustZipApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         if self.startup.is_some() {
@@ -1130,7 +1130,7 @@ impl eframe::App for RustRarApp {
     }
 }
 
-impl RustRarApp {
+impl RustZipApp {
     fn handle_dropped(&mut self, ctx: &egui::Context) {
         let dropped: Vec<PathBuf> = ctx.input(|i| {
             i.raw
@@ -1276,7 +1276,7 @@ impl RustRarApp {
                         }
                     });
                     ui.menu_button("帮助", |ui| {
-                        if ui.button("关于 RustRAR").clicked() {
+                        if ui.button("关于 RustZip").clicked() {
                             self.dlg = Dialog::About;
                             ui.close();
                         }

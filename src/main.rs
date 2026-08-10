@@ -1,4 +1,4 @@
-//! RustRAR —— 用 Rust 编写的图形化压缩/解压工具（参考 WinRAR 的体验）。
+//! RustZip —— 用 Rust 编写的图形化压缩/解压工具（参考 WinRAR 的体验）。
 //!
 //! 入口：解析命令行、装配模块、安装中文字体与主题、启动 eframe 主窗口。
 
@@ -25,7 +25,7 @@ fn main() -> eframe::Result {
 
     let options = NativeOptions {
         viewport: ViewportBuilder::default()
-            .with_title("RustRAR")
+            .with_title("RustZip")
             .with_inner_size([1100.0, 720.0])
             .with_min_inner_size([680.0, 420.0])
             .with_icon(load_icon()),
@@ -33,11 +33,11 @@ fn main() -> eframe::Result {
     };
 
     eframe::run_native(
-        "RustRAR",
+        "RustZip",
         options,
         Box::new(|cc| {
             crate::ui::theme::install(&cc.egui_ctx);
-            Ok(Box::new(app::RustRarApp::new(startup)))
+            Ok(Box::new(app::RustZipApp::new(startup)))
         }),
     )
 }

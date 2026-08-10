@@ -1,4 +1,4 @@
-# RustRAR 开发文档
+# RustZip 开发文档
 
 > 用 Rust 编写的图形化压缩 / 解压工具（参考 WinRAR 的体验）。
 > 本文档面向后续在本仓库上继续开发的工程师，覆盖架构设计、模块职责、核心实现、构建与测试、发布与扩展。
@@ -9,7 +9,7 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| 名称 | RustRAR |
+| 名称 | RustZip |
 | 语言 / 工具链 | Rust（edition 2024），cargo 1.92+ |
 | GUI 框架 | eframe / egui 0.35（纯 Rust 即时模式 GUI） |
 | 压缩引擎 | `zip` crate 8.6（支持 Deflate / Stored / AES-256 加密） |
@@ -191,7 +191,7 @@ cargo build
 cargo build --release
 ```
 
-发布版可执行文件：`target/release/rustrar.exe`
+发布版可执行文件：`target/release/rustzip.exe`
 
 > **关于终端窗口**：`main.rs` 顶部通过
 > `#![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]`
@@ -201,16 +201,16 @@ cargo build --release
 
 ```bash
 # 直接运行（浏览用户主目录）
-target/release/rustrar.exe
+target/release/rustzip.exe
 
 # 命令行入口（供右键菜单 / 脚本调用）
-rustrar.exe --register-shell          # 注册右键菜单（HKCU）
-rustrar.exe --unregister-shell        # 取消右键菜单
-rustrar.exe --compress "文件1" "文件2" # 打开压缩对话框并预填源
-rustrar.exe --extract-here "a.zip"    # 直接解压到压缩包所在目录
-rustrar.exe --extract-to "a.zip"      # 打开解压对话框
-rustrar.exe "某个目录"                # 在该目录启动
-rustrar.exe "a.zip"                   # 打开压缩包
+rustzip.exe --register-shell          # 注册右键菜单（HKCU）
+rustzip.exe --unregister-shell        # 取消右键菜单
+rustzip.exe --compress "文件1" "文件2" # 打开压缩对话框并预填源
+rustzip.exe --extract-here "a.zip"    # 直接解压到压缩包所在目录
+rustzip.exe --extract-to "a.zip"      # 打开解压对话框
+rustzip.exe "某个目录"                # 在该目录启动
+rustzip.exe "a.zip"                   # 打开压缩包
 ```
 
 ### 5.4 测试
@@ -246,12 +246,12 @@ cargo test
 
 | 注册表路径 | 菜单项 | 命令 |
 | --- | --- | --- |
-| `*\shell\RustRAR.Add` | 添加到压缩文件… | `--compress "%1"` |
-| `Directory\shell\RustRAR.Add` | 添加到压缩文件… | `--compress "%1"` |
-| `SystemFileAssociations\.zip\shell\RustRAR.Open` | 用 RustRAR 打开 | `"%1"` |
-| `...\RustRAR.ExtractTo` | 解压到… | `--extract-to "%1"` |
-| `...\RustRAR.ExtractHere` | 解压到当前文件夹 | `--extract-here "%1"` |
-| `Directory\Background\shell\RustRAR.Open` | 在此处打开 RustRAR | `"%V"` |
+| `*\shell\RustZip.Add` | 添加到压缩文件… | `--compress "%1"` |
+| `Directory\shell\RustZip.Add` | 添加到压缩文件… | `--compress "%1"` |
+| `SystemFileAssociations\.zip\shell\RustZip.Open` | 用 RustZip 打开 | `"%1"` |
+| `...\RustZip.ExtractTo` | 解压到… | `--extract-to "%1"` |
+| `...\RustZip.ExtractHere` | 解压到当前文件夹 | `--extract-here "%1"` |
+| `Directory\Background\shell\RustZip.Open` | 在此处打开 RustZip | `"%V"` |
 
 注册 / 注销后调用 `SHChangeNotify(SHCNE_ASSOCCHANGED)` 通知资源管理器刷新。
 

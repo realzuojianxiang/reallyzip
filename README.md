@@ -1,4 +1,4 @@
-# RustRAR
+# RustZip
 
 用 Rust + egui 编写的图形化压缩 / 解压工具，参考 WinRAR 的体验。现代 Fluent 风格界面，支持 ZIP 的创建、解压、加密、分卷、包内浏览等完整能力。
 
@@ -26,19 +26,19 @@
 cargo build --release
 ```
 
-可执行文件：`target/release/rustrar.exe`
+可执行文件：`target/release/rustzip.exe`
 
 ### 运行
 
 ```bash
 # 直接运行，浏览用户主目录
-target/release/rustrar.exe
+target/release/rustzip.exe
 
 # 命令行入口（供右键菜单 / 脚本）
-rustrar.exe --register-shell          # 注册右键菜单
-rustrar.exe --unregister-shell        # 取消右键菜单
-rustrar.exe --compress "文件1" "文件2" # 打开压缩对话框
-rustrar.exe "a.zip"                   # 打开压缩包
+rustzip.exe --register-shell          # 注册右键菜单
+rustzip.exe --unregister-shell        # 取消右键菜单
+rustzip.exe --compress "文件1" "文件2" # 打开压缩对话框
+rustzip.exe "a.zip"                   # 打开压缩包
 ```
 
 ### 测试

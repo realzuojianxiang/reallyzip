@@ -1,9 +1,9 @@
 [package]
-name = "rustrar"
+name = "rustzip"
 version = "0.1.0"
 edition = "2024"
-description = "RustRAR - 用 Rust 编写的图形化压缩/解压工具"
-authors = ["RustRAR"]
+description = "RustZip - 用 Rust 编写的图形化压缩/解压工具"
+authors = ["RustZip"]
 
 [dependencies]
 anyhow = "1.0"

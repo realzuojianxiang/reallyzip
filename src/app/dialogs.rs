@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl RustRarApp {
+impl RustZipApp {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context) {
         match self.dlg.clone() {
             Dialog::None => {}
@@ -575,7 +575,7 @@ impl RustRarApp {
                 ui.separator();
                 ui.add_space(6.0);
                 ui.label(RichText::new("临时文件").strong().size(14.0));
-                let tmp = std::env::temp_dir().join("rustrar");
+                let tmp = std::env::temp_dir().join("rustzip");
                 ui.label(
                     RichText::new(format!("目录：{}", tmp.display()))
                         .color(theme::TEXT_DIM)
@@ -597,6 +597,11 @@ impl RustRarApp {
                                     n += 1;
                                 }
                             }
+                        }
+                        // 顺带清掉旧版 RustRAR 遗留的临时目录
+                        let legacy = std::env::temp_dir().join("rustrar");
+                        if legacy.is_dir() && std::fs::remove_dir_all(&legacy).is_ok() {
+                            n += 1;
                         }
                         self.info = Some(format!("已清理 {n} 个临时项。"));
                     }
@@ -624,7 +629,7 @@ impl RustRarApp {
 
     fn about_dialog(&mut self, ctx: &egui::Context) {
         let mut open = true;
-        egui::Window::new("关于 RustRAR")
+        egui::Window::new("关于 RustZip")
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
@@ -641,7 +646,7 @@ impl RustRarApp {
                             icons::paint_in(ui, r, IconKind::Archive);
                             ui.vertical(|ui| {
                                 ui.add_space(4.0);
-                                ui.label(RichText::new("RustRAR").size(20.0).strong().color(theme::ACCENT_DARK));
+                                ui.label(RichText::new("RustZip").size(20.0).strong().color(theme::ACCENT_DARK));
                                 ui.label(
                                     RichText::new(format!("版本 {}", env!("CARGO_PKG_VERSION")))
                                         .color(theme::TEXT_DIM),
