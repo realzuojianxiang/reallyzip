@@ -10,6 +10,8 @@ pub enum Startup {
     Open(PathBuf),
     /// 打开压缩对话框，预填这些源文件。
     Compress(Vec<PathBuf>),
+    /// 不弹对话框，直接压缩为同目录同名 .zip。
+    CompressHere(Vec<PathBuf>),
     /// 直接解压到压缩包所在目录。
     ExtractHere(PathBuf),
     /// 打开解压对话框。
@@ -18,6 +20,18 @@ pub enum Startup {
     Browse(PathBuf),
     RegisterShell,
     UnregisterShell,
+}
+
+/// 只保留真实存在的路径。
+///
+/// 右键菜单用 `%*` 传多选文件，万一 shell 没有展开（旧系统或 Player 多选模型
+/// 不生效），这里会得到字面量 `%*`；过滤掉之后 `parse` 会退回普通启动，
+/// 而不是去压缩一个名为 `%*` 的文件。
+fn existing_paths(args: &[String]) -> Vec<PathBuf> {
+    args.iter()
+        .map(PathBuf::from)
+        .filter(|p| p.exists())
+        .collect()
 }
 
 pub fn parse() -> Startup {
@@ -30,9 +44,15 @@ pub fn parse() -> Startup {
         "--register-shell" => return Startup::RegisterShell,
         "--unregister-shell" => return Startup::UnregisterShell,
         "--compress" => {
-            let paths: Vec<PathBuf> = args[1..].iter().map(PathBuf::from).collect();
+            let paths = existing_paths(&args[1..]);
             if !paths.is_empty() {
                 return Startup::Compress(paths);
+            }
+        }
+        "--compress-here" => {
+            let paths = existing_paths(&args[1..]);
+            if !paths.is_empty() {
+                return Startup::CompressHere(paths);
             }
         }
         "--extract-here" => {

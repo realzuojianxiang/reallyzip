@@ -14,7 +14,7 @@ fn rep() -> Reporter {
 }
 
 fn tmp_root() -> PathBuf {
-    let p = std::env::temp_dir().join(format!("rustzip_test_{}", std::process::id()));
+    let p = std::env::temp_dir().join(format!("reallyzip_test_{}", std::process::id()));
     fs::create_dir_all(&p).unwrap();
     p
 }
@@ -60,7 +60,7 @@ fn assert_roundtrip(root: &Path, zip: &Path, password: Option<&str>) {
 fn create_and_extract_roundtrip() {
     let root = tmp_root().join("rt");
     let _ = fs::remove_dir_all(&root);
-    write(&root.join("hello.txt"), "Hello, RustZip!");
+    write(&root.join("hello.txt"), "Hello, ReallyZip!");
     write(&root.join("docs/note.md"), "# 标题\n正文内容");
     write(&root.join("data/big.bin"), &"X".repeat(20_000));
 

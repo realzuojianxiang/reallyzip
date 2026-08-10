@@ -1,4 +1,4 @@
-# RustZip 开发文档
+# ReallyZip 开发文档
 
 > 用 Rust 编写的图形化压缩 / 解压工具（参考 WinRAR 的体验）。
 > 本文档面向后续在本仓库上继续开发的工程师，覆盖架构设计、模块职责、核心实现、构建与测试、发布与扩展。
@@ -9,12 +9,12 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| 名称 | RustZip |
+| 名称 | ReallyZip |
 | 语言 / 工具链 | Rust（edition 2024），cargo 1.92+ |
 | GUI 框架 | eframe / egui 0.35（纯 Rust 即时模式 GUI） |
 | 压缩引擎 | `zip` crate 8.6（支持 Deflate / Stored / AES-256 加密） |
 | 目标平台 | Windows（右键菜单集成为 Windows 专属，其余逻辑跨平台） |
-| 许可证 | 未指定（内部项目） |
+| 许可证 | MIT（见 `LICENSE`） |
 
 ### 核心能力
 
@@ -191,7 +191,7 @@ cargo build
 cargo build --release
 ```
 
-发布版可执行文件：`target/release/rustzip.exe`
+发布版可执行文件：`target/release/reallyzip.exe`
 
 > **关于终端窗口**：`main.rs` 顶部通过
 > `#![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]`
@@ -201,16 +201,17 @@ cargo build --release
 
 ```bash
 # 直接运行（浏览用户主目录）
-target/release/rustzip.exe
+target/release/reallyzip.exe
 
 # 命令行入口（供右键菜单 / 脚本调用）
-rustzip.exe --register-shell          # 注册右键菜单（HKCU）
-rustzip.exe --unregister-shell        # 取消右键菜单
-rustzip.exe --compress "文件1" "文件2" # 打开压缩对话框并预填源
-rustzip.exe --extract-here "a.zip"    # 直接解压到压缩包所在目录
-rustzip.exe --extract-to "a.zip"      # 打开解压对话框
-rustzip.exe "某个目录"                # 在该目录启动
-rustzip.exe "a.zip"                   # 打开压缩包
+reallyzip.exe --register-shell          # 注册右键菜单（HKCU）
+reallyzip.exe --unregister-shell        # 取消右键菜单
+reallyzip.exe --compress "文件1" "文件2" # 打开压缩对话框并预填源
+reallyzip.exe --compress-here "文件1"   # 直接压缩为同名 zip（不弹对话框）
+reallyzip.exe --extract-here "a.zip"    # 直接解压到压缩包所在目录
+reallyzip.exe --extract-to "a.zip"      # 打开解压对话框
+reallyzip.exe "某个目录"                # 在该目录启动
+reallyzip.exe "a.zip"                   # 打开压缩包
 ```
 
 ### 5.4 测试
@@ -242,18 +243,51 @@ cargo test
 
 ## 7. Windows 右键菜单集成（`shell.rs`）
 
-写入 `HKEY_CURRENT_USER`（无需管理员权限），注册以下项：
+全部写入 `HKEY_CURRENT_USER`（无需管理员权限，也不需要注册 COM 组件），
+采用 Windows 7+ 的 **`ExtendedSubCommandsKey` 级联菜单**：右键顶层只出现一个
+「ReallyZip」入口，展开后才是具体动作。
 
-| 注册表路径 | 菜单项 | 命令 |
+### 7.1 顶级入口（只有属性，没有 `command` 子键）
+
+| 注册表路径 | 指向子菜单 | 备注 |
 | --- | --- | --- |
-| `*\shell\RustZip.Add` | 添加到压缩文件… | `--compress "%1"` |
-| `Directory\shell\RustZip.Add` | 添加到压缩文件… | `--compress "%1"` |
-| `SystemFileAssociations\.zip\shell\RustZip.Open` | 用 RustZip 打开 | `"%1"` |
-| `...\RustZip.ExtractTo` | 解压到… | `--extract-to "%1"` |
-| `...\RustZip.ExtractHere` | 解压到当前文件夹 | `--extract-here "%1"` |
-| `Directory\Background\shell\RustZip.Open` | 在此处打开 RustZip | `"%V"` |
+| `*\shell\ReallyZip` | `ReallyZip.FileMenu` | `AppliesTo = NOT System.FileName:"*.zip"`，避免 zip 上出现两个入口 |
+| `Directory\shell\ReallyZip` | `ReallyZip.FileMenu` | 文件夹 |
+| `SystemFileAssociations\.zip\shell\ReallyZip` | `ReallyZip.ZipMenu` | 压缩包 |
+| `Directory\Background\shell\ReallyZip.Open` | —（扁平 verb） | 只有一个动作，无需级联 |
 
-注册 / 注销后调用 `SHChangeNotify(SHCNE_ASSOCCHANGED)` 通知资源管理器刷新。
+入口键上的值：`MUIVerb`（显示文字）、`Icon`、`ExtendedSubCommandsKey`、`Position=Top`。
+
+### 7.2 子菜单（键名带数字前缀以控制排序）
+
+`Software\Classes\ReallyZip.FileMenu\shell`：
+
+| 子键 | 菜单项 | 命令 |
+| --- | --- | --- |
+| `01Add` | 添加到压缩文件… | `--compress %*` |
+| `02AddTo` | 压缩为 ZIP | `--compress-here %*` |
+
+`Software\Classes\ReallyZip.ZipMenu\shell`：
+
+| 子键 | 菜单项 | 命令 |
+| --- | --- | --- |
+| `01Open` | 用 ReallyZip 打开 | `"%1"` |
+| `02ExtractTo` | 解压到… | `--extract-to "%1"` |
+| `03ExtractHere` | 解压到当前文件夹 | `--extract-here "%1"` |
+| `04Add` | 添加到压缩文件… | `--compress %*` |
+
+### 7.3 几个要点
+
+- **多选**：压缩类动作设 `MultiSelectModel = "Player"`，选中多个文件只启动一个
+  实例，全部路径经 `%*` 一次传入，压进同一个包；解压类保持默认（每个包一个实例）。
+- **降级保护**：`cli.rs` 的 `existing_paths()` 会过滤掉不存在的参数，万一 `%*`
+  没被 shell 展开，程序退回普通启动而不是去压缩一个名为 `%*` 的文件。
+- **菜单文字是静态的**：注册表 verb 无法像 WinRAR 那样显示「添加到 xxx.rar」这种
+  含文件名的动态文案——那需要实现 COM 的 `IContextMenu`。所以这里用「压缩为 ZIP」。
+- **历史遗留清理**：项目改过两次名（RustRAR → RustZip → ReallyZip），`LEGACY_KEYS`
+  列出了两代共 12 个旧键，`register()` / `unregister()` 都会先清一遍；`purge_own()`
+  则保证重复注册时是全新结构而非增量叠加。
+- 注册 / 注销后调用 `SHChangeNotify(SHCNE_ASSOCCHANGED)` 通知资源管理器刷新。
 
 ---
 

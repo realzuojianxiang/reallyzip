@@ -169,7 +169,7 @@ struct Preview {
 
 // ------------------------------------------------------------------ App
 
-pub struct RustZipApp {
+pub struct ReallyZipApp {
     cwd: PathBuf, // 空路径表示“此电脑”
     archive: Option<OpenArchive>,
     inner: String,
@@ -201,7 +201,7 @@ pub struct RustZipApp {
     startup: Option<Startup>,
 }
 
-impl RustZipApp {
+impl ReallyZipApp {
     pub fn new(startup: Startup) -> Self {
         let home = home_dir();
         Self {
@@ -1013,6 +1013,13 @@ impl RustZipApp {
                 };
                 self.dlg = Dialog::Create;
             }
+            Startup::CompressHere(paths) => {
+                if let Some(parent) = paths[0].parent() {
+                    self.cwd = parent.to_path_buf();
+                }
+                let dest = default_zip_name(&paths);
+                self.start_create(ctx, paths, dest, CreateOptions::default(), false);
+            }
             Startup::ExtractHere(p) => {
                 if let Some(parent) = p.parent() {
                     self.cwd = parent.to_path_buf();
@@ -1061,7 +1068,7 @@ impl RustZipApp {
 
 // ------------------------------------------------------------------ 绘制
 
-impl eframe::App for RustZipApp {
+impl eframe::App for ReallyZipApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         if self.startup.is_some() {
@@ -1130,7 +1137,7 @@ impl eframe::App for RustZipApp {
     }
 }
 
-impl RustZipApp {
+impl ReallyZipApp {
     fn handle_dropped(&mut self, ctx: &egui::Context) {
         let dropped: Vec<PathBuf> = ctx.input(|i| {
             i.raw
@@ -1276,7 +1283,7 @@ impl RustZipApp {
                         }
                     });
                     ui.menu_button("帮助", |ui| {
-                        if ui.button("关于 RustZip").clicked() {
+                        if ui.button("关于 ReallyZip").clicked() {
                             self.dlg = Dialog::About;
                             ui.close();
                         }
@@ -1807,6 +1814,38 @@ fn file_name_of(p: &Path) -> String {
 }
 
 /// `a.zip` -> `a`；`a.zip.001` -> `a`
+/// 右键「压缩为 xxx.zip」的默认目标名：
+/// 单选取该项自身的名字，多选取所在文件夹的名字；重名时自动追加 (2)(3)…
+fn default_zip_name(sources: &[PathBuf]) -> PathBuf {
+    let first = &sources[0];
+    let dir = first.parent().map(|p| p.to_path_buf()).unwrap_or_default();
+    let stem = if sources.len() == 1 {
+        if first.is_dir() {
+            file_name_of(first)
+        } else {
+            first
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "archive".into())
+        }
+    } else {
+        let name = file_name_of(&dir);
+        if name.is_empty() {
+            "archive".to_string()
+        } else {
+            name
+        }
+    };
+
+    let mut dest = dir.join(format!("{stem}.zip"));
+    let mut n = 2;
+    while dest.exists() {
+        dest = dir.join(format!("{stem} ({n}).zip"));
+        n += 1;
+    }
+    dest
+}
+
 fn stem_without_zip(p: &Path) -> String {
     let mut name = file_name_of(p);
     if volume::is_volume_part(Path::new(&name)) {

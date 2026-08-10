@@ -71,7 +71,7 @@ pub fn merge_volumes(volumes: &[PathBuf], rep: &Reporter) -> Result<PathBuf> {
         .file_stem()
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_else(|| "archive.zip".into());
-    let tmp_dir = std::env::temp_dir().join("rustzip");
+    let tmp_dir = std::env::temp_dir().join("reallyzip");
     std::fs::create_dir_all(&tmp_dir).ok();
     let out_path = tmp_dir.join(format!(
         "merged_{}_{}",

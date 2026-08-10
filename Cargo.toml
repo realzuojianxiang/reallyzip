@@ -1,9 +1,9 @@
 [package]
-name = "rustzip"
+name = "reallyzip"
 version = "0.1.0"
 edition = "2024"
-description = "RustZip - 用 Rust 编写的图形化压缩/解压工具"
-authors = ["RustZip"]
+description = "ReallyZip - 用 Rust 编写的图形化压缩/解压工具"
+authors = ["ReallyZip"]
 
 [dependencies]
 anyhow = "1.0"

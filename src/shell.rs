@@ -1,4 +1,18 @@
 //! Windows 资源管理器右键菜单集成（写入 HKCU，无需管理员权限）。
+//!
+//! 采用 Windows 7+ 的 `ExtendedSubCommandsKey` 级联菜单：右键只出现一个
+//! 「ReallyZip」入口，展开后才是具体动作，不污染顶层菜单。
+//!
+//! 结构示意：
+//! ```text
+//! HKCU\Software\Classes\*\shell\ReallyZip          (顶级入口，无 command)
+//!     MUIVerb                = ReallyZip
+//!     ExtendedSubCommandsKey = ReallyZip.FileMenu  ← 相对 HKEY_CLASSES_ROOT
+//!
+//! HKCU\Software\Classes\ReallyZip.FileMenu\shell   (子菜单，按键名排序)
+//!     01Add   → 添加到压缩文件…
+//!     02AddTo → 压缩为 ZIP
+//! ```
 
 #[cfg(windows)]
 mod imp {
@@ -6,25 +20,58 @@ mod imp {
     use winreg::RegKey;
     use winreg::enums::*;
 
-    const ADD_FILE: &str = r"Software\Classes\*\shell\RustZip.Add";
-    const ADD_DIR: &str = r"Software\Classes\Directory\shell\RustZip.Add";
-    const ZIP_ROOT: &str = r"Software\Classes\SystemFileAssociations\.zip\shell";
-    const BG_OPEN: &str = r"Software\Classes\Directory\Background\shell\RustZip.Open";
+    /// 子菜单根键名（`ExtendedSubCommandsKey` 的值按 HKEY_CLASSES_ROOT 解析）。
+    const MENU_FILE: &str = "ReallyZip.FileMenu";
+    const MENU_ZIP: &str = "ReallyZip.ZipMenu";
 
-    /// 项目早期名为 RustRAR，这些是遗留的注册表项，需要一并清理避免孤儿菜单。
+    /// 四个顶级入口。
+    const ENTRY_FILE: &str = r"Software\Classes\*\shell\ReallyZip";
+    const ENTRY_DIR: &str = r"Software\Classes\Directory\shell\ReallyZip";
+    const ENTRY_ZIP: &str = r"Software\Classes\SystemFileAssociations\.zip\shell\ReallyZip";
+    const ENTRY_BG: &str = r"Software\Classes\Directory\Background\shell\ReallyZip.Open";
+
+    /// 历史版本（RustRAR → RustZip → ReallyZip）留下的扁平菜单项，
+    /// 每次注册/取消注册都清一遍，避免右键出现多套孤儿菜单。
     const LEGACY_KEYS: &[&str] = &[
+        // 第一代：RustRAR
         r"Software\Classes\*\shell\RustRAR.Add",
         r"Software\Classes\Directory\shell\RustRAR.Add",
         r"Software\Classes\Directory\Background\shell\RustRAR.Open",
         r"Software\Classes\SystemFileAssociations\.zip\shell\RustRAR.Open",
         r"Software\Classes\SystemFileAssociations\.zip\shell\RustRAR.ExtractTo",
         r"Software\Classes\SystemFileAssociations\.zip\shell\RustRAR.ExtractHere",
+        // 第二代：RustZip
+        r"Software\Classes\*\shell\RustZip.Add",
+        r"Software\Classes\Directory\shell\RustZip.Add",
+        r"Software\Classes\Directory\Background\shell\RustZip.Open",
+        r"Software\Classes\SystemFileAssociations\.zip\shell\RustZip.Open",
+        r"Software\Classes\SystemFileAssociations\.zip\shell\RustZip.ExtractTo",
+        r"Software\Classes\SystemFileAssociations\.zip\shell\RustZip.ExtractHere",
     ];
 
-    /// 删除旧版 RustRAR 遗留的右键菜单项（无则静默跳过）。
+    fn menu_root(name: &str) -> String {
+        format!(r"Software\Classes\{name}")
+    }
+
+    /// 删除历史版本遗留的右键菜单项（不存在则静默跳过）。
     fn purge_legacy() {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         for path in LEGACY_KEYS {
+            let _ = hkcu.delete_subkey_all(path);
+        }
+    }
+
+    /// 删除本版自己写过的键，保证重复注册时是全新结构而非增量叠加。
+    fn purge_own() {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        for path in [
+            ENTRY_FILE,
+            ENTRY_DIR,
+            ENTRY_ZIP,
+            ENTRY_BG,
+            &menu_root(MENU_FILE),
+            &menu_root(MENU_ZIP),
+        ] {
             let _ = hkcu.delete_subkey_all(path);
         }
     }
@@ -33,73 +80,113 @@ mod imp {
         Ok(std::env::current_exe()?.to_string_lossy().to_string())
     }
 
-    fn make_verb(path: &str, title: &str, args: &str, exe: &str, position: Option<&str>) -> Result<()> {
+    /// 写一个可执行动作（带 command 子键）。
+    ///
+    /// `multi` 为真时使用 Player 多选模型：一次选中多个文件只启动一个实例，
+    /// 全部路径通过 `%*` 传入，用于「添加到压缩文件」这类需要合并处理的动作。
+    fn write_verb(path: &str, title: &str, args: &str, exe: &str, multi: bool) -> Result<()> {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let (key, _) = hkcu
             .create_subkey(path)
             .with_context(|| format!("无法创建注册表项 {path}"))?;
-        key.set_value("", &title)?;
+        key.set_value("MUIVerb", &title)?;
         key.set_value("Icon", &format!("\"{exe}\",0"))?;
-        if let Some(pos) = position {
-            key.set_value("Position", &pos)?;
+        if multi {
+            key.set_value("MultiSelectModel", &"Player")?;
         }
         let (cmd, _) = key.create_subkey("command")?;
         cmd.set_value("", &format!("\"{exe}\" {args}"))?;
         Ok(())
     }
 
+    /// 写一个级联入口（没有 command 子键，指向子菜单根键）。
+    fn write_cascade(path: &str, submenu: &str, exe: &str, applies_to: Option<&str>) -> Result<()> {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let (key, _) = hkcu
+            .create_subkey(path)
+            .with_context(|| format!("无法创建注册表项 {path}"))?;
+        key.set_value("MUIVerb", &"ReallyZip")?;
+        key.set_value("Icon", &format!("\"{exe}\",0"))?;
+        key.set_value("ExtendedSubCommandsKey", &submenu)?;
+        key.set_value("Position", &"Top")?;
+        if let Some(a) = applies_to {
+            key.set_value("AppliesTo", &a)?;
+        }
+        Ok(())
+    }
+
     pub fn register() -> Result<()> {
         let exe = exe()?;
-
-        // 先清掉旧版 RustRAR 的菜单项，避免新旧两套同时出现
         purge_legacy();
+        purge_own();
 
-        // 任意文件 / 文件夹：添加到压缩文件
-        make_verb(ADD_FILE, "添加到压缩文件…(RustZip)", "--compress \"%1\"", &exe, Some("Top"))?;
-        make_verb(ADD_DIR, "添加到压缩文件…(RustZip)", "--compress \"%1\"", &exe, Some("Top"))?;
+        // ---- 子菜单 A：普通文件与文件夹 ----
+        let a = menu_root(MENU_FILE);
+        write_verb(
+            &format!(r"{a}\shell\01Add"),
+            "添加到压缩文件…",
+            "--compress %*",
+            &exe,
+            true,
+        )?;
+        write_verb(
+            &format!(r"{a}\shell\02AddTo"),
+            "压缩为 ZIP",
+            "--compress-here %*",
+            &exe,
+            true,
+        )?;
 
-        // .zip 文件专属动作
-        make_verb(
-            &format!(r"{ZIP_ROOT}\RustZip.Open"),
-            "用 RustZip 打开",
+        // ---- 子菜单 B：.zip 文件 ----
+        let b = menu_root(MENU_ZIP);
+        write_verb(
+            &format!(r"{b}\shell\01Open"),
+            "用 ReallyZip 打开",
             "\"%1\"",
             &exe,
-            Some("Top"),
+            false,
         )?;
-        make_verb(
-            &format!(r"{ZIP_ROOT}\RustZip.ExtractTo"),
-            "解压到…(RustZip)",
+        write_verb(
+            &format!(r"{b}\shell\02ExtractTo"),
+            "解压到…",
             "--extract-to \"%1\"",
             &exe,
-            None,
+            false,
         )?;
-        make_verb(
-            &format!(r"{ZIP_ROOT}\RustZip.ExtractHere"),
-            "解压到当前文件夹(RustZip)",
+        write_verb(
+            &format!(r"{b}\shell\03ExtractHere"),
+            "解压到当前文件夹",
             "--extract-here \"%1\"",
             &exe,
-            None,
+            false,
+        )?;
+        write_verb(
+            &format!(r"{b}\shell\04Add"),
+            "添加到压缩文件…",
+            "--compress %*",
+            &exe,
+            true,
         )?;
 
-        // 文件夹空白处：打开 RustZip
-        make_verb(BG_OPEN, "在此处打开 RustZip", "\"%V\"", &exe, None)?;
+        // ---- 顶级入口 ----
+        // 通配入口排除 .zip，否则压缩包上会同时出现两个 ReallyZip 菜单
+        write_cascade(
+            ENTRY_FILE,
+            MENU_FILE,
+            &exe,
+            Some("NOT System.FileName:\"*.zip\""),
+        )?;
+        write_cascade(ENTRY_DIR, MENU_FILE, &exe, None)?;
+        write_cascade(ENTRY_ZIP, MENU_ZIP, &exe, None)?;
+        // 文件夹空白处只有一个动作，扁平呈现即可
+        write_verb(ENTRY_BG, "在此处打开 ReallyZip", "\"%V\"", &exe, false)?;
 
         notify_shell();
         Ok(())
     }
 
     pub fn unregister() -> Result<()> {
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        for path in [
-            ADD_FILE,
-            ADD_DIR,
-            BG_OPEN,
-            &format!(r"{ZIP_ROOT}\RustZip.Open"),
-            &format!(r"{ZIP_ROOT}\RustZip.ExtractTo"),
-            &format!(r"{ZIP_ROOT}\RustZip.ExtractHere"),
-        ] {
-            let _ = hkcu.delete_subkey_all(path);
-        }
+        purge_own();
         purge_legacy();
         notify_shell();
         Ok(())
@@ -107,7 +194,7 @@ mod imp {
 
     pub fn is_registered() -> bool {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        hkcu.open_subkey(ADD_FILE).is_ok()
+        hkcu.open_subkey(ENTRY_FILE).is_ok()
     }
 
     fn notify_shell() {

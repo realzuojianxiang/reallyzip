@@ -539,7 +539,7 @@ pub fn create(
 
     // 分卷时先写到临时文件，最后再切分
     let building = if opt.split_size > 0 {
-        let tmp_dir = std::env::temp_dir().join("rustzip");
+        let tmp_dir = std::env::temp_dir().join("reallyzip");
         fs::create_dir_all(&tmp_dir)?;
         tmp_dir.join(format!("building_{}.zip", std::process::id()))
     } else {
@@ -652,7 +652,7 @@ pub fn delete_entries(archive: &Path, targets: &HashSet<String>, rep: &Reporter)
     let n = za.len();
     rep.total(n as u64);
 
-    let tmp = archive.with_extension("rustzip_tmp");
+    let tmp = archive.with_extension("reallyzip_tmp");
     let out = File::create(&tmp)?;
     let mut zw = ZipWriter::new(BufWriter::with_capacity(BUF, out));
 
@@ -874,7 +874,7 @@ pub fn extract_one_to_temp(
         .context("压缩包中找不到该条目")?;
 
     let tmp_dir = std::env::temp_dir()
-        .join("rustzip")
+        .join("reallyzip")
         .join(format!("view_{}", std::process::id()));
     fs::create_dir_all(&tmp_dir)?;
     let out_path = tmp_dir.join(util::base_name(&meta.path));
