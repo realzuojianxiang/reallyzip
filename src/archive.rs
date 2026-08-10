@@ -386,16 +386,61 @@ struct Item {
     size: u64,
 }
 
+/// 计算所有源路径的最深公共祖先目录。
+/// - 多个路径：返回它们共享的最长父目录前缀（用于保留相对结构，避免跨目录同名覆盖）。
+/// - 单个路径：返回其所在目录（即该条目在 zip 内以自身名位于根，符合直觉）。
+fn common_ancestor(paths: &[PathBuf]) -> Option<PathBuf> {
+    if paths.is_empty() {
+        return None;
+    }
+    if paths.len() == 1 {
+        return paths[0].parent().map(|p| p.to_path_buf());
+    }
+    let mut common: PathBuf = paths[0].components().collect();
+    for p in &paths[1..] {
+        let other: PathBuf = p.components().collect();
+        let mut next = PathBuf::new();
+        for (a, b) in common.components().zip(other.components()) {
+            if a == b {
+                next.push(a.as_os_str());
+            } else {
+                break;
+            }
+        }
+        common = next;
+        if common.as_os_str().is_empty() {
+            break;
+        }
+    }
+    Some(common)
+}
+
+/// 计算某个源路径在 zip 内部应使用的相对路径名。
+/// 相对 common_base 取相对路径；若无法取相对（base 为空或自身即 base），退化为文件名。
+fn zip_rel_name(src: &Path, base: &Path) -> String {
+    if !base.as_os_str().is_empty() {
+        if let Ok(rel) = src.strip_prefix(base)
+            && !rel.as_os_str().is_empty()
+        {
+            return rel.to_string_lossy().replace('\\', "/");
+        }
+    }
+    src.file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| src.to_string_lossy().replace([':', '\\', '/'], "_"))
+}
+
 fn collect_items(sources: &[PathBuf]) -> Result<(Vec<Item>, u64)> {
     let mut items = Vec::new();
     let mut total = 0u64;
 
+    let base = common_ancestor(sources)
+        .or_else(|| sources.first().and_then(|p| p.parent().map(|x| x.to_path_buf())))
+        .unwrap_or_default();
+
     for src in sources {
         let md = fs::metadata(src).with_context(|| format!("无法读取 {}", src.display()))?;
-        let name = src
-            .file_name()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| src.to_string_lossy().replace([':', '\\', '/'], "_"));
+        let name = zip_rel_name(src, &base);
 
         if md.is_dir() {
             items.push(Item {

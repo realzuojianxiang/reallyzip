@@ -3,7 +3,7 @@
 """
 ReallyZip 命令行端到端自动化测试（无头）。
 
-覆盖：压缩（多文件/单文件/目录/Unicode/冲突命名/空目录）、解压（extract-here）、
+覆盖：压缩（多文件/单文件/目录/Unicode/跨目录同名/冲突命名/空目录）、解压（extract-here）、
 大文件往返、跨工具互操作（Python <-> ReallyZip）、异常与边界、右键菜单注册/注销。
 
 用法：
@@ -52,6 +52,16 @@ def sha(p):
 
 def snap_zips(folder):
     return set(f for f in os.listdir(folder) if f.lower().endswith(".zip"))
+
+
+def snap_zips_rec(folder):
+    """递归收集目录下所有 .zip 的完整路径（用于多文件压缩时输出落在子目录的情况）。"""
+    out = []
+    for root, _, files in os.walk(folder):
+        for f in files:
+            if f.lower().endswith(".zip"):
+                out.append(os.path.join(root, f))
+    return set(out)
 
 
 def reg_get(path, name="", root=HKCU):
@@ -107,10 +117,10 @@ def test_multi_file():
             zp = os.path.join(d, list(new)[0])
             with zipfile.ZipFile(zp) as z:
                 names = set(z.namelist())
-            # 多文件按各自文件名扁平存储（丢弃源目录层级）
-            ok = {"a.txt", "b.txt", "c.txt"} <= names
+            # 以公共父目录为根保留相对路径层级（c.txt 在 sub/ 内 → sub/c.txt）
+            ok = {"a.txt", "b.txt", "sub/c.txt"} <= names
         rec("T-CLI-01", "多文件 --compress-here 生成单个 zip 含全部", ok,
-            f"rc={r.returncode} names={sorted(names)} (扁平化)")
+            f"rc={r.returncode} names={sorted(names)} (保留相对路径)")
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -176,8 +186,8 @@ def test_unicode_names():
         if ok:
             with zipfile.ZipFile(os.path.join(d, list(new)[0])) as z:
                 names = set(z.namelist())
-            ok = ("文件 A.txt" in names) and ("内容 中文.txt" in names)
-        rec("T-CLI-04", "空格/中文/Unicode 文件名无损(扁平化)", ok,
+            ok = ("文件 A.txt" in names) and ("目录 B/内容 中文.txt" in names)
+        rec("T-CLI-04", "空格/中文/Unicode 文件名无损(保留相对路径)", ok,
             f"rc={r.returncode} names={sorted(names)}")
     finally:
         shutil.rmtree(d, ignore_errors=True)
@@ -334,6 +344,40 @@ def test_empty_dir():
         shutil.rmtree(d, ignore_errors=True)
 
 
+# ---------------------------------------------------------------- T-CLI-14 (F-01 回归)
+def test_crossdir_collision():
+    """不同目录里同名文件不应互相覆盖（F-01 修复验证）。"""
+    d = tempfile.mkdtemp()
+    try:
+        dir_a = os.path.join(d, "folder_a")
+        dir_b = os.path.join(d, "folder_b")
+        os.makedirs(dir_a); os.makedirs(dir_b)
+        pa = os.path.join(dir_a, "report.txt")
+        pb = os.path.join(dir_b, "report.txt")
+        open(pa, "w", encoding="utf-8").write("内容-A")
+        open(pb, "w", encoding="utf-8").write("内容-B")
+        before = snap_zips_rec(d)
+        r = run(["--compress-here", pa, pb])
+        new = snap_zips_rec(d) - before
+        ok = r.returncode == 0 and len(new) == 1
+        names = set()
+        if ok:
+            with zipfile.ZipFile(list(new)[0]) as z:
+                names = set(z.namelist())
+            # 公共祖先为 d，因此保留相对路径 folder_a/report.txt 与 folder_b/report.txt
+            ok = {"folder_a/report.txt", "folder_b/report.txt"} <= names
+            # 且两者内容都能独立还原
+            if ok:
+                with zipfile.ZipFile(os.path.join(d, list(new)[0])) as z:
+                    ca = z.read("folder_a/report.txt").decode("utf-8")
+                    cb = z.read("folder_b/report.txt").decode("utf-8")
+                ok = (ca == "内容-A") and (cb == "内容-B")
+        rec("T-CLI-14", "F-01: 跨目录同名文件保留相对路径不覆盖", ok,
+            f"rc={r.returncode} names={sorted(names)}")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 # ---------------------------------------------------------------- T-SH-01/02/03
 def test_shell():
     # 先确保干净
@@ -390,6 +434,7 @@ def main():
     test_error_nonexistent()
     test_error_not_zip()
     test_empty_dir()
+    test_crossdir_collision()
     test_shell()
     print("=" * 72)
     passed = sum(1 for _, _, s, _ in results if s)
