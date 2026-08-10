@@ -136,6 +136,20 @@ fn aes_password_protection() {
     let ar = open(&zip, &rep()).unwrap();
     assert!(ar.has_encrypted, "应标记为已加密");
 
+    // verify_password：正确密码通过、错误密码拒绝
+    assert!(
+        verify_password(&zip, "s3cret"),
+        "正确密码应通过校验"
+    );
+    assert!(
+        !verify_password(&zip, "wrong"),
+        "错误密码应通过校验被拒绝"
+    );
+    assert!(
+        !verify_password(&zip, ""),
+        "空密码应通过校验被拒绝"
+    );
+
     // 错误密码解压应失败
     let bad = tmp_root().join("bad");
     let err = extract(

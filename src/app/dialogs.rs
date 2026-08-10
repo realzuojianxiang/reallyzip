@@ -42,11 +42,10 @@ impl RustRarApp {
                 );
                 if ui.button("浏览…").clicked() {
                     let mut d = rfd::FileDialog::new().add_filter("ZIP 压缩包", &["zip"]);
-                    if let Some(parent) = Path::new(&self.create.dest).parent() {
-                        if parent.exists() {
+                    if let Some(parent) = Path::new(&self.create.dest).parent()
+                        && parent.exists() {
                             d = d.set_directory(parent);
                         }
-                    }
                     if let Some(name) = Path::new(&self.create.dest).file_name() {
                         d = d.set_file_name(name.to_string_lossy().to_string());
                     }
@@ -507,6 +506,12 @@ impl RustRarApp {
                 self.error = Some("密码不能为空".into());
                 return;
             }
+            // 能拿到压缩包路径时，先校验密码；错误则留在对话框，避免错误密码被缓存导致永久锁死。
+            if let Some(ap) = &self.pw_archive
+                && !archive::verify_password(ap, &self.pw_input) {
+                    self.error = Some("密码错误，请重新输入".into());
+                    return;
+                }
             self.password = Some(self.pw_input.clone());
             self.dlg = Dialog::None;
             if let Some(a) = self.pending_after_pw.take() {

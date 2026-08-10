@@ -223,6 +223,35 @@ pub fn read_entries(path: &Path) -> Result<Vec<ArchiveEntry>> {
     Ok(out)
 }
 
+/// 尝试验证压缩包密码是否正确。
+/// 找到第一个加密文件并尝试用给定密码解密：成功返回 true。
+/// 若压缩包无加密文件，视作无需密码，返回 true。
+pub fn verify_password(archive: &Path, password: &str) -> bool {
+    let Ok(file) = File::open(archive) else {
+        return false;
+    };
+    let Ok(mut za) = ZipArchive::new(BufReader::with_capacity(BUF, file)) else {
+        return false;
+    };
+    let mut target: Option<usize> = None;
+    for i in 0..za.len() {
+        let Ok(f) = za.by_index_raw(i) else {
+            continue;
+        };
+        if f.encrypted() && !f.is_dir() {
+            target = Some(i);
+            break;
+        }
+    }
+    let Some(idx) = target else {
+        return true; // 无加密文件，无需校验
+    };
+    if password.is_empty() {
+        return false;
+    }
+    za.by_index_decrypt(idx, password.as_bytes()).is_ok()
+}
+
 /// 打开压缩包（自动识别并合并分卷）。
 pub fn open(path: &Path, rep: &Reporter) -> Result<OpenArchive> {
     let (real_path, volumes, temp_merged) = if volume::is_volume_part(path) {

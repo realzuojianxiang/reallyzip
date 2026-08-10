@@ -25,7 +25,7 @@ pub fn format_thousands(n: u64) -> String {
     let bytes = s.as_bytes();
     let mut out = String::with_capacity(s.len() + s.len() / 3);
     for (i, c) in bytes.iter().enumerate() {
-        if i > 0 && (bytes.len() - i) % 3 == 0 {
+        if i > 0 && (bytes.len() - i).is_multiple_of(3) {
             out.push(',');
         }
         out.push(*c as char);
@@ -186,8 +186,9 @@ pub fn open_with_system(path: &Path) {
 pub fn reveal_in_explorer(path: &Path) {
     #[cfg(windows)]
     {
+        // 路径含空格时必须加引号，否则 explorer 会被空格截断参数。
         let _ = std::process::Command::new("explorer")
-            .arg(format!("/select,{}", path.display()))
+            .arg(format!("/select,\"{}\"", path.display()))
             .spawn();
     }
     #[cfg(not(windows))]

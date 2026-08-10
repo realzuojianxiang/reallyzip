@@ -192,6 +192,7 @@ pub struct RustRarApp {
     pw_show: bool,
     pw_hint: String,
     pending_after_pw: Option<Action>,
+    pw_archive: Option<PathBuf>,
     password: Option<String>,
     preview: Option<Preview>,
     shell_registered: bool,
@@ -224,6 +225,7 @@ impl RustRarApp {
             pw_show: false,
             pw_hint: String::new(),
             pending_after_pw: None,
+            pw_archive: None,
             password: None,
             preview: None,
             shell_registered: shell::is_registered(),
@@ -638,10 +640,11 @@ impl RustRarApp {
             && self.password.is_none()
     }
 
-    fn ask_password(&mut self, hint: &str, then: Action) {
+    fn ask_password(&mut self, hint: &str, then: Action, archive: Option<PathBuf>) {
         self.pw_input.clear();
         self.pw_hint = hint.to_string();
         self.pending_after_pw = Some(then);
+        self.pw_archive = archive;
         self.dlg = Dialog::Password;
     }
 
@@ -687,7 +690,8 @@ impl RustRarApp {
             }
             Action::OpenInnerFile(p) => {
                 if self.need_password() {
-                    self.ask_password("该压缩包已加密，请输入密码", Action::OpenInnerFile(p));
+                    let ap = self.archive.as_ref().map(|a| a.real_path.clone());
+                    self.ask_password("该压缩包已加密，请输入密码", Action::OpenInnerFile(p), ap);
                 } else {
                     self.start_preview(ctx, p);
                 }
@@ -699,7 +703,8 @@ impl RustRarApp {
             Action::ExtractHere => self.quick_extract_here(ctx),
             Action::Test => {
                 if self.need_password() {
-                    self.ask_password("该压缩包已加密，请输入密码后测试", Action::Test);
+                    let ap = self.archive.as_ref().map(|a| a.real_path.clone());
+                    self.ask_password("该压缩包已加密，请输入密码后测试", Action::Test, ap);
                 } else {
                     self.start_test(ctx);
                 }
@@ -759,11 +764,10 @@ impl RustRarApp {
     }
 
     fn close_archive(&mut self) {
-        if let Some(ar) = self.archive.take() {
-            if let Some(parent) = ar.display_path.parent() {
+        if let Some(ar) = self.archive.take()
+            && let Some(parent) = ar.display_path.parent() {
                 self.cwd = parent.to_path_buf();
             }
-        }
         self.inner.clear();
         self.password = None;
         self.refresh();
@@ -830,11 +834,14 @@ impl RustRarApp {
                 .parent()
                 .map(|p| p.join(stem_without_zip(&target)))
                 .unwrap_or_default();
+            let has_encrypted = archive::read_entries(&target)
+                .map(|e| e.iter().any(|x| x.encrypted))
+                .unwrap_or(false);
             self.extract = ExtractDlg {
                 archive: target,
                 dest: dest.display().to_string(),
                 selection: None,
-                needs_pw: false,
+                needs_pw: has_encrypted,
                 count_label: "全部内容".to_string(),
                 ..Default::default()
             };
@@ -891,12 +898,21 @@ impl RustRarApp {
                     .parent()
                     .map(|p| p.join(stem_without_zip(&target)))
                     .unwrap_or_default();
-                (target, dest, false)
+                // 本地视图下需主动探测是否加密
+                let has_encrypted = archive::read_entries(&target)
+                    .map(|e| e.iter().any(|x| x.encrypted))
+                    .unwrap_or(false);
+                (target, dest, has_encrypted)
             }
         };
 
         if needs_pw && self.password.is_none() {
-            self.ask_password("该压缩包已加密，请输入密码", Action::ExtractHere);
+            let ap = if let Some(ar) = &self.archive {
+                ar.real_path.clone()
+            } else {
+                archive_path.clone()
+            };
+            self.ask_password("该压缩包已加密，请输入密码", Action::ExtractHere, Some(ap));
             return;
         }
 
@@ -1341,11 +1357,10 @@ impl RustRarApp {
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         let info = icons::tool_button(ui, "信息", ToolIcon::Info, in_archive);
-                        if info.clicked() {
-                            if let Some(ar) = &self.archive {
+                        if info.clicked()
+                            && let Some(ar) = &self.archive {
                                 self.info = Some(archive_info_text(ar));
                             }
-                        }
                     });
                 });
     }
@@ -1530,7 +1545,7 @@ impl RustRarApp {
                                 ui.horizontal(|ui| {
                                     let resp = ui.add(
                                         egui::Label::new(
-                                            RichText::new(format!("{title}"))
+                                            RichText::new(title.to_string())
                                                 .strong()
                                                 .size(12.0)
                                                 .color(theme::TEXT_DIM),
@@ -1577,9 +1592,7 @@ impl RustRarApp {
                                         }
                                     }
                                     Col::Size => {
-                                        if !row.is_parent && !row.is_dir {
-                                            right_label(ui, &util::format_size(row.size));
-                                        } else if !row.is_parent && row.is_dir && row.size > 0 {
+                                        if !row.is_parent && (!row.is_dir || row.size > 0) {
                                             right_label(ui, &util::format_size(row.size));
                                         }
                                     }
