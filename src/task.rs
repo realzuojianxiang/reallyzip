@@ -31,8 +31,7 @@ pub struct Reporter {
 }
 
 impl Reporter {
-    /// 构造一个不绑定 UI 的汇报器，供测试或无界面场景使用。
-    #[cfg(test)]
+    /// 构造一个不绑定 UI 的汇报器，供测试或无界面（如右键菜单静默压缩）场景使用。
     pub fn new(ctx: egui::Context) -> Self {
         let (tx, _rx) = channel();
         let cancel = Arc::new(AtomicBool::new(false));

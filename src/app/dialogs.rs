@@ -555,7 +555,10 @@ impl ReallyZipApp {
                         match shell::register() {
                             Ok(_) => {
                                 self.shell_registered = shell::is_registered();
-                                self.info = Some("右键菜单已注册成功。".into());
+                                let where_ = shell::registered_exe()
+                                    .map(|p| format!("（已安装到 {p}）"))
+                                    .unwrap_or_default();
+                                self.info = Some(format!("右键菜单已注册成功{where_}"));
                             }
                             Err(e) => self.error = Some(format!("注册失败：{e}")),
                         }
@@ -570,6 +573,17 @@ impl ReallyZipApp {
                         }
                     }
                 });
+                // 已注册时展示实际指向的 exe 路径，方便排查
+                if self.shell_registered {
+                    if let Some(p) = shell::registered_exe() {
+                        ui.add_space(6.0);
+                        ui.label(
+                            RichText::new(format!("注册位置：{p}"))
+                                .color(theme::TEXT_DIM)
+                                .size(11.0),
+                        );
+                    }
+                }
 
                 ui.add_space(14.0);
                 ui.separator();

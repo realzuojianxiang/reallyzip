@@ -1816,7 +1816,7 @@ fn file_name_of(p: &Path) -> String {
 /// `a.zip` -> `a`；`a.zip.001` -> `a`
 /// 右键「压缩为 xxx.zip」的默认目标名：
 /// 单选取该项自身的名字，多选取所在文件夹的名字；重名时自动追加 (2)(3)…
-fn default_zip_name(sources: &[PathBuf]) -> PathBuf {
+pub(crate) fn default_zip_name(sources: &[PathBuf]) -> PathBuf {
     let first = &sources[0];
     let dir = first.parent().map(|p| p.to_path_buf()).unwrap_or_default();
     let stem = if sources.len() == 1 {
@@ -1846,7 +1846,7 @@ fn default_zip_name(sources: &[PathBuf]) -> PathBuf {
     dest
 }
 
-fn stem_without_zip(p: &Path) -> String {
+pub(crate) fn stem_without_zip(p: &Path) -> String {
     let mut name = file_name_of(p);
     if volume::is_volume_part(Path::new(&name)) {
         name = name[..name.len().saturating_sub(4)].to_string();

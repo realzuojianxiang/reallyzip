@@ -14,6 +14,9 @@ mod ui;
 mod util;
 mod volume;
 
+use archive::{CreateOptions, ExtractOptions, Overwrite};
+use task::Reporter;
+
 #[cfg(test)]
 mod tests;
 
@@ -22,6 +25,60 @@ use egui::ViewportBuilder;
 
 fn main() -> eframe::Result {
     let startup = cli::parse();
+
+    // 无需图形界面的「动作类」参数：直接执行并退出。
+    // - 注册 / 注销右键菜单：本就不需要窗口，避免白开一个 GUI。
+    // - 静默压缩 / 解压（--compress-here / --extract-here）：右键菜单的
+    //   「压缩为 ZIP」「解压到当前文件夹」本就不需要弹窗，直接做掉即可，
+    //   既快又不闪窗，也避免无显示环境下整条链路卡死。
+    // 只有需要对话框或浏览压缩包的动作才启动 GUI。
+    match startup {
+        cli::Startup::RegisterShell => {
+            if let Err(e) = shell::register() {
+                eprintln!("注册右键菜单失败：{e}");
+            }
+            return Ok(());
+        }
+        cli::Startup::UnregisterShell => {
+            if let Err(e) = shell::unregister() {
+                eprintln!("注销右键菜单失败：{e}");
+            }
+            return Ok(());
+        }
+        cli::Startup::CompressHere(paths) => {
+            if paths.is_empty() {
+                eprintln!("未收到任何文件：资源管理器没有把选中项通过 %* 传给程序。请确认右键菜单注册正确，或用 install.bat 重新注册。");
+                return Ok(());
+            }
+            let dest = app::default_zip_name(&paths);
+            let rep = Reporter::new(egui::Context::default());
+            match archive::create(&paths, &dest, &CreateOptions::default(), &rep) {
+                Ok(msg) => println!("{msg}"),
+                Err(e) => eprintln!("压缩失败：{e}"),
+            }
+            return Ok(());
+        }
+        cli::Startup::ExtractHere(p) => {
+            let dest = p
+                .parent()
+                .map(|d| d.join(app::stem_without_zip(&p)))
+                .unwrap_or_default();
+            let opt = ExtractOptions {
+                dest,
+                selection: None,
+                password: None,
+                keep_paths: true,
+                overwrite: Overwrite::AutoRename,
+            };
+            let rep = Reporter::new(egui::Context::default());
+            match archive::extract(&p, &opt, &rep) {
+                Ok(msg) => println!("{msg}"),
+                Err(e) => eprintln!("解压失败：{e}"),
+            }
+            return Ok(());
+        }
+        _ => {}
+    }
 
     let options = NativeOptions {
         viewport: ViewportBuilder::default()

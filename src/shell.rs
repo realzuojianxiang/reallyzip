@@ -76,8 +76,45 @@ mod imp {
         }
     }
 
-    fn exe() -> Result<String> {
-        Ok(std::env::current_exe()?.to_string_lossy().to_string())
+    /// 稳定安装目录：%LOCALAPPDATA%\ReallyZip
+    fn install_root() -> std::path::PathBuf {
+        let local = std::env::var("LOCALAPPDATA")
+            .unwrap_or_else(|_| std::env::temp_dir().to_string_lossy().to_string());
+        std::path::Path::new(&local).join("ReallyZip")
+    }
+
+    /// 返回用于注册的可执行文件路径。
+    ///
+    /// 若当前 exe 不在稳定安装目录，先把自身复制过去（保证注册表指向固定位置，
+    /// 以后移动/重命名下载目录里的原 exe，右键菜单也不会失效），返回稳定副本路径；
+    /// 若已在稳定目录，直接返回自身路径。复制失败时退回当前路径，至少能注册上。
+    fn exe_for_register() -> String {
+        let current = match std::env::current_exe() {
+            Ok(p) => p,
+            Err(_) => return String::new(),
+        };
+        let target = install_root().join("reallyzip.exe");
+        if current.to_string_lossy().to_lowercase() == target.to_string_lossy().to_lowercase() {
+            return current.to_string_lossy().to_string();
+        }
+        if std::fs::create_dir_all(install_root()).is_ok()
+            && std::fs::copy(&current, &target).is_ok()
+        {
+            return target.to_string_lossy().to_string();
+        }
+        current.to_string_lossy().to_string()
+    }
+
+    /// 读取已注册的可执行文件路径（用于 UI 展示「注册位置」），未注册返回 None。
+    pub fn registered_exe() -> Option<String> {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let path = format!(r"{MENU_FILE}\shell\02AddTo\command");
+        let v: String = hkcu.open_subkey(&path).ok()?.get_value("").ok()?;
+        // 命令形如 "C:\x\reallyzip.exe" --compress-here %*
+        let start = v.find('"')?;
+        let rest = &v[start + 1..];
+        let end = rest.find('"')?;
+        Some(rest[..end].to_string())
     }
 
     /// 写一个可执行动作（带 command 子键）。
@@ -116,7 +153,7 @@ mod imp {
     }
 
     pub fn register() -> Result<()> {
-        let exe = exe()?;
+        let exe = exe_for_register();
         purge_legacy();
         purge_own();
 
@@ -188,6 +225,8 @@ mod imp {
     pub fn unregister() -> Result<()> {
         purge_own();
         purge_legacy();
+        // 清理稳定安装目录里的副本，避免留下孤立文件
+        let _ = std::fs::remove_dir_all(install_root());
         notify_shell();
         Ok(())
     }
@@ -232,6 +271,9 @@ mod imp {
     pub fn is_registered() -> bool {
         false
     }
+    pub fn registered_exe() -> Option<String> {
+        None
+    }
 }
 
-pub use imp::{is_registered, register, unregister};
+pub use imp::{is_registered, registered_exe, register, unregister};
