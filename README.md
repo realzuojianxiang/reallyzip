@@ -7,7 +7,7 @@
 
 ## 📦 下载
 
-**[⬇️ 下载最新版 reallyzip.exe](https://github.com/realzuojianxiang/reallyzip/releases/latest/download/reallyzip-windows-x64.exe)** · Windows 10/11 x64 · 6.5 MB
+**[⬇️ 下载最新版 reallyzip.exe](https://github.com/realzuojianxiang/reallyzip/releases/latest/download/reallyzip.exe)** · Windows 10/11 x64 · 6.5 MB
 
 单文件绿色运行，无需安装、无运行时依赖。其他版本见 [Releases](https://github.com/realzuojianxiang/reallyzip/releases)。
 
