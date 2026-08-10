@@ -8,18 +8,33 @@ authors = ["RustZip"]
 [dependencies]
 anyhow = "1.0"
 chrono = "0.4"
-eframe = "0.35"
+# 关闭默认的 wgpu 后端，改用体积小得多的 glow(OpenGL)；同时去掉 accesskit 无障碍层。
+# 若在无 OpenGL 驱动的环境（部分虚拟机/远程桌面）出现黑屏，把 features 换回 ["wgpu", "default_fonts"] 即可。
+eframe = { version = "0.35", default-features = false, features = [
+    "glow",
+    "default_fonts",
+    "wayland",
+    "x11",
+] }
 egui = "0.35"
-egui_extras = "0.35"
+egui_extras = { version = "0.35", default-features = false }
 rfd = "0.17"
 walkdir = "2.5"
-zip = { version = "8.6", features = ["chrono"] }
+# 只保留实际用到的编解码：Deflate(含 Deflate64 解压) + AES 加密。
+# 裁掉 bzip2 / zstd / lzma / xz / ppmd，代价是无法解压使用这些冷门方法压缩的 zip。
+zip = { version = "8.6", default-features = false, features = [
+    "aes-crypto",
+    "deflate",
+    "deflate64",
+    "chrono",
+] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"
 
 [profile.release]
 opt-level = 3
-lto = false
-codegen-units = 16
+lto = "fat"
+codegen-units = 1
+panic = "abort"
 strip = true

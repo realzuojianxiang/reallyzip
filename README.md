@@ -26,7 +26,25 @@
 cargo build --release
 ```
 
-可执行文件：`target/release/rustzip.exe`
+可执行文件：`target/release/rustzip.exe`，约 **6.5 MB**，单文件绿色运行、无需任何运行时依赖。
+
+<details>
+<summary>体积是怎么压到 6.5 MB 的（默认配置是 16 MB）</summary>
+
+| 手段 | 说明 | 省下 |
+|---|---|---|
+| 渲染后端 wgpu → glow | `eframe` 0.35 默认走 wgpu（DX12/Vulkan 抽象层，体积巨大），改用 glow(OpenGL) | ~6 MB |
+| 关闭 accesskit | 去掉屏幕阅读器无障碍层 | ~1 MB |
+| 裁剪 zip 编解码 | 只留 Deflate / Deflate64 / AES，去掉 bzip2、zstd、lzma、xz、ppmd | ~1.5 MB |
+| LTO fat + codegen-units=1 | 全程序链接时优化 | ~1 MB |
+| panic = "abort" | 去掉 unwind 栈展开表 | ~0.3 MB |
+
+代价与回退：
+
+- 极少数无 OpenGL 驱动的环境（部分虚拟机 / 远程桌面）可能黑屏 —— 把 `Cargo.toml` 里 eframe 的 features 换回 `["wgpu", "default_fonts"]` 即可。
+- 无法解压用 bzip2 / zstd / lzma / xz 方法压缩的 zip（这些在 zip 里极罕见）—— 在 zip 的 features 里补回对应项即可。
+
+</details>
 
 ### 运行
 

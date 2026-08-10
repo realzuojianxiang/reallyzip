@@ -1,4 +1,5 @@
 /target
+/dist
 
 # 工具生成的记忆 / 内部数据
 .workbuddy/
