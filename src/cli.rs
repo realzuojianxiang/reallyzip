@@ -44,16 +44,12 @@ pub fn parse() -> Startup {
         "--register-shell" => return Startup::RegisterShell,
         "--unregister-shell" => return Startup::UnregisterShell,
         "--compress" => {
-            let paths = existing_paths(&args[1..]);
-            if !paths.is_empty() {
-                return Startup::Compress(paths);
-            }
+            // 即使过滤后为空也返回该变体，交由 main 的空路径分支优雅退出，
+            // 避免 fall-through 到 Normal 而启动 GUI（右键传入 %* 未展开时尤其重要）。
+            return Startup::Compress(existing_paths(&args[1..]));
         }
         "--compress-here" => {
-            let paths = existing_paths(&args[1..]);
-            if !paths.is_empty() {
-                return Startup::CompressHere(paths);
-            }
+            return Startup::CompressHere(existing_paths(&args[1..]));
         }
         "--extract-here" => {
             if let Some(p) = args.get(1) {
