@@ -1,0 +1,25 @@
+[package]
+name = "rustrar"
+version = "0.1.0"
+edition = "2024"
+description = "RustRAR - 用 Rust 编写的图形化压缩/解压工具"
+authors = ["RustRAR"]
+
+[dependencies]
+anyhow = "1.0"
+chrono = "0.4"
+eframe = "0.35"
+egui = "0.35"
+egui_extras = "0.35"
+rfd = "0.17"
+walkdir = "2.5"
+zip = { version = "8.6", features = ["chrono"] }
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56"
+
+[profile.release]
+opt-level = 3
+lto = false
+codegen-units = 16
+strip = true
