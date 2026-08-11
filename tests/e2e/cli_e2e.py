@@ -421,6 +421,56 @@ def test_unquoted_space_multi():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_percent1_percent_star_single():
+    """D-03 回归：Explorer 单选走 `%1`（%* 为空），命令用 `%1 %*` 后
+    同一路径会被传两次，必须去重后只生成一个含 1 个文件的 zip。"""
+    import subprocess as _sp
+    d = tempfile.mkdtemp(prefix="d03 single ")
+    try:
+        p = os.path.join(d, "报告 文档.txt")
+        open(p, "w", encoding="utf-8").write("x")
+        before = snap_zips(d)
+        # 模拟注册命令 "%1 %*"：单选时 %1 与 %* 都是同一路径 → 传两次
+        cmd = f'"{EXE}" --compress-here {p} {p}'
+        r = _sp.run(cmd, shell=True, capture_output=True, text=True, timeout=60)
+        new = snap_zips(d) - before
+        names = set()
+        ok = r.returncode == 0 and len(new) == 1
+        if ok:
+            with zipfile.ZipFile(os.path.join(d, list(new)[0])) as z:
+                names = set(z.namelist())
+            ok = names == {"报告 文档.txt"}
+        rec("T-CLI-17", "D-03 回归: 单选%1%*重复路径去重生成单文件zip", ok,
+            f"rc={r.returncode} names={sorted(names)}")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_percent1_percent_star_multi():
+    """D-03 回归：多选走 `%1 %*`（`%1`=首项，`%*`=全部），去重后合并为一个 zip。"""
+    import subprocess as _sp
+    d = tempfile.mkdtemp(prefix="d03 multi ")
+    try:
+        fs = [os.path.join(d, n) for n in ["a 文件.txt", "b 文件.txt", "c 文件.txt"]]
+        for x in fs:
+            open(x, "w", encoding="utf-8").write("x")
+        before = snap_zips(d)
+        # %1 = fs[0], %* = fs（含首项）→ 首项重复一次
+        cmd = f'"{EXE}" --compress-here {fs[0]} {" ".join(fs)}'
+        r = _sp.run(cmd, shell=True, capture_output=True, text=True, timeout=60)
+        new = snap_zips(d) - before
+        names = set()
+        ok = r.returncode == 0 and len(new) == 1
+        if ok:
+            with zipfile.ZipFile(os.path.join(d, list(new)[0])) as z:
+                names = set(z.namelist())
+            ok = {"a 文件.txt", "b 文件.txt", "c 文件.txt"} <= names
+        rec("T-CLI-18", "D-03 回归: 多选%1%*去重合并为单zip", ok,
+            f"rc={r.returncode} names={sorted(names)}")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 # ---------------------------------------------------------------- T-SH-01/02/03
 def test_shell():
     # 先确保干净
@@ -480,6 +530,8 @@ def main():
     test_crossdir_collision()
     test_unquoted_space_path()
     test_unquoted_space_multi()
+    test_percent1_percent_star_single()
+    test_percent1_percent_star_multi()
     test_shell()
     print("=" * 72)
     passed = sum(1 for _, _, s, _ in results if s)

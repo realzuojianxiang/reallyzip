@@ -162,14 +162,14 @@ mod imp {
         write_verb(
             &format!(r"{a}\shell\01Add"),
             "添加到压缩文件…",
-            "--compress %*",
+            "--compress %1 %*",
             &exe,
             true,
         )?;
         write_verb(
             &format!(r"{a}\shell\02AddTo"),
             "压缩为 ZIP",
-            "--compress-here %*",
+            "--compress-here %1 %*",
             &exe,
             true,
         )?;
@@ -200,7 +200,7 @@ mod imp {
         write_verb(
             &format!(r"{b}\shell\04Add"),
             "添加到压缩文件…",
-            "--compress %*",
+            "--compress %1 %*",
             &exe,
             true,
         )?;

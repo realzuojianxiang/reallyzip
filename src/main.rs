@@ -8,6 +8,7 @@
 mod app;
 mod archive;
 mod cli;
+mod diag;
 mod shell;
 mod task;
 mod ui;
@@ -24,7 +25,14 @@ use eframe::NativeOptions;
 use egui::ViewportBuilder;
 
 fn main() -> eframe::Result {
+    diag::reset();
+    diag::log(&format!(
+        "raw args = {:?}",
+        std::env::args().collect::<Vec<_>>()
+    ));
+
     let startup = cli::parse();
+    diag::log(&format!("parsed startup = {startup:?}"));
 
     // 无需图形界面的「动作类」参数：直接执行并退出。
     // - 注册 / 注销右键菜单：本就不需要窗口，避免白开一个 GUI。
@@ -46,23 +54,48 @@ fn main() -> eframe::Result {
             return Ok(());
         }
         cli::Startup::CompressHere(paths) => {
+            diag::log(&format!("CompressHere paths = {paths:?}"));
             if paths.is_empty() {
+                diag::log("CompressHere: 路径为空，直接退出（资源管理器未通过 %* 传入文件）");
                 eprintln!("未收到任何文件：资源管理器没有把选中项通过 %* 传给程序。请确认右键菜单注册正确，或用 install.bat 重新注册。");
                 return Ok(());
             }
             let dest = app::default_zip_name(&paths);
+            diag::log(&format!("CompressHere dest = {dest:?}"));
             let rep = Reporter::new(egui::Context::default());
-            match archive::create(&paths, &dest, &CreateOptions::default(), &rep) {
-                Ok(msg) => println!("{msg}"),
-                Err(e) => eprintln!("压缩失败：{e}"),
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                archive::create(&paths, &dest, &CreateOptions::default(), &rep)
+            }));
+            match result {
+                Ok(Ok(msg)) => {
+                    diag::log(&format!("压缩成功: {msg} -> dest={dest:?}"));
+                    println!("{msg}");
+                }
+                Ok(Err(e)) => {
+                    diag::log(&format!("压缩失败: {e:?}"));
+                    eprintln!("压缩失败：{e}");
+                }
+                Err(pay) => {
+                    let msg = if let Some(s) = pay.downcast_ref::<String>() {
+                        s.clone()
+                    } else if let Some(s) = pay.downcast_ref::<&str>() {
+                        s.to_string()
+                    } else {
+                        "未知 panic（非字符串负载）".to_string()
+                    };
+                    diag::log(&format!("压缩过程 PANIC: {msg}"));
+                    eprintln!("压缩过程崩溃：{msg}");
+                }
             }
             return Ok(());
         }
         cli::Startup::ExtractHere(p) => {
+            diag::log(&format!("ExtractHere path = {p:?}"));
             let dest = p
                 .parent()
                 .map(|d| d.join(app::stem_without_zip(&p)))
                 .unwrap_or_default();
+            diag::log(&format!("ExtractHere dest = {dest:?}"));
             let opt = ExtractOptions {
                 dest,
                 selection: None,
@@ -71,9 +104,29 @@ fn main() -> eframe::Result {
                 overwrite: Overwrite::AutoRename,
             };
             let rep = Reporter::new(egui::Context::default());
-            match archive::extract(&p, &opt, &rep) {
-                Ok(msg) => println!("{msg}"),
-                Err(e) => eprintln!("解压失败：{e}"),
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                archive::extract(&p, &opt, &rep)
+            }));
+            match result {
+                Ok(Ok(msg)) => {
+                    diag::log(&format!("解压成功: {msg}"));
+                    println!("{msg}");
+                }
+                Ok(Err(e)) => {
+                    diag::log(&format!("解压失败: {e:?}"));
+                    eprintln!("解压失败：{e}");
+                }
+                Err(pay) => {
+                    let msg = if let Some(s) = pay.downcast_ref::<String>() {
+                        s.clone()
+                    } else if let Some(s) = pay.downcast_ref::<&str>() {
+                        s.to_string()
+                    } else {
+                        "未知 panic（非字符串负载）".to_string()
+                    };
+                    diag::log(&format!("解压过程 PANIC: {msg}"));
+                    eprintln!("解压过程崩溃：{msg}");
+                }
             }
             return Ok(());
         }

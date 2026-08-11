@@ -2,6 +2,8 @@
 
 use std::path::PathBuf;
 
+use crate::diag;
+
 #[derive(Debug, Clone)]
 pub enum Startup {
     /// 普通启动，浏览本地目录。
@@ -65,14 +67,21 @@ fn reconstruct_paths(tokens: &[String]) -> Vec<PathBuf> {
 /// 万一 shell 没有展开（旧系统或 Player 多选模型不生效）而得到字面量 `%*`，
 /// 过滤后为空，`parse` 会退回普通启动，而不是去压缩一个名为 `%*` 的文件。
 fn existing_paths(args: &[String]) -> Vec<PathBuf> {
-    reconstruct_paths(args)
-        .into_iter()
-        .filter(|p| p.exists())
-        .collect()
+    let reconstructed = reconstruct_paths(args);
+    diag::log(&format!(
+        "parse: reconstruct_paths({args:?}) = {reconstructed:?}"
+    ));
+    let mut kept: Vec<PathBuf> = reconstructed.into_iter().filter(|p| p.exists()).collect();
+    // 注册命令用 `%1 %*`：单选时 `%1` 与 `%*` 的首项重复，去重避免同一文件进压缩包两次。
+    kept.sort();
+    kept.dedup();
+    diag::log(&format!("parse: existing_paths after filter+dedup = {kept:?}"));
+    kept
 }
 
 pub fn parse() -> Startup {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    diag::log(&format!("parse: raw tokens = {args:?}"));
     if args.is_empty() {
         return Startup::Normal;
     }
