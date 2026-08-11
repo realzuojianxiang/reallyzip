@@ -378,6 +378,49 @@ def test_crossdir_collision():
         shutil.rmtree(d, ignore_errors=True)
 
 
+# ---------------------------------------------------------------- T-CLI-15/16 (右键 %* 未加引号回归)
+def test_unquoted_space_path():
+    """模拟资源管理器用未加引号的 %* 传递含空格路径（如 文档/我的文档）。"""
+    import subprocess as _sp
+    d = tempfile.mkdtemp(prefix="test dir ")
+    try:
+        p = os.path.join(d, "报告 文档.txt")
+        open(p, "w", encoding="utf-8").write("内容")
+        before = snap_zips(d)
+        # 路径刻意不加引号，复现 %* 展开后被空格拆散的真实场景
+        cmd = f'"{EXE}" --compress-here {p}'
+        r = _sp.run(cmd, shell=True, capture_output=True, text=True, timeout=60)
+        new = snap_zips(d) - before
+        ok = r.returncode == 0 and len(new) == 1
+        rec("T-CLI-15", "右键%*未引号: 含空格路径仍能生成zip", ok,
+            f"rc={r.returncode} new={sorted(new)} err={r.stderr.strip()[:60]}")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_unquoted_space_multi():
+    """多选含空格路径（%* 未引号）应合并进同一个 zip。"""
+    import subprocess as _sp
+    d = tempfile.mkdtemp(prefix="sel dir ")
+    try:
+        p1 = os.path.join(d, "a 文件.txt"); p2 = os.path.join(d, "b 文件.txt")
+        open(p1, "w").write("A"); open(p2, "w").write("B")
+        before = snap_zips(d)
+        cmd = f'"{EXE}" --compress-here {p1} {p2}'
+        r = _sp.run(cmd, shell=True, capture_output=True, text=True, timeout=60)
+        new = snap_zips(d) - before
+        names = set()
+        ok = r.returncode == 0 and len(new) == 1
+        if ok:
+            with zipfile.ZipFile(os.path.join(d, list(new)[0])) as z:
+                names = set(z.namelist())
+            ok = {"a 文件.txt", "b 文件.txt"} <= names
+        rec("T-CLI-16", "右键%*未引号: 多选含空格合并进同一zip", ok,
+            f"rc={r.returncode} names={sorted(names)}")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 # ---------------------------------------------------------------- T-SH-01/02/03
 def test_shell():
     # 先确保干净
@@ -435,6 +478,8 @@ def main():
     test_error_not_zip()
     test_empty_dir()
     test_crossdir_collision()
+    test_unquoted_space_path()
+    test_unquoted_space_multi()
     test_shell()
     print("=" * 72)
     passed = sum(1 for _, _, s, _ in results if s)

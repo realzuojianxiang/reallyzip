@@ -22,14 +22,51 @@ pub enum Startup {
     UnregisterShell,
 }
 
+/// 重建被空格拆散的路径。
+///
+/// 右键菜单命令里的 `%*` / `%1` 未加引号时，路径含空格会被 Windows 按空格拆成
+/// 多个参数（如 `C:\我的文档\报告.txt` → `C:\我的文档\报告.txt` 被拆成三段）。
+/// 这里把相邻 token 贪心拼接成「真实存在的最长路径」，从而还原出完整路径。
+/// 对本来就正确的带引号参数无副作用（单个 token 已存在时直接采纳）。
+fn reconstruct_paths(tokens: &[String]) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < tokens.len() {
+        let mut merged: Option<String> = None;
+        let mut end = i + 1;
+        // 从最长拼接开始尝试，命中真实存在的路径即采纳
+        for j in (i + 1..=tokens.len()).rev() {
+            let cand = tokens[i..j].join(" ");
+            if std::path::Path::new(&cand).exists() {
+                merged = Some(cand);
+                end = j;
+                break;
+            }
+        }
+        match merged {
+            Some(p) => {
+                out.push(PathBuf::from(p));
+                i = end;
+            }
+            None => {
+                // 没有任何拼接存在于磁盘：原样保留，后续交给 .exists() 过滤
+                out.push(PathBuf::from(&tokens[i]));
+                i += 1;
+            }
+        }
+    }
+    out
+}
+
 /// 只保留真实存在的路径。
 ///
-/// 右键菜单用 `%*` 传多选文件，万一 shell 没有展开（旧系统或 Player 多选模型
-/// 不生效），这里会得到字面量 `%*`；过滤掉之后 `parse` 会退回普通启动，
-/// 而不是去压缩一个名为 `%*` 的文件。
+/// 右键菜单用 `%*` 传多选文件，且 `%*` 不会被 Windows 加引号；空间含空格的路径
+/// 会被拆散，`reconstruct_paths` 先尝试还原完整路径，再按存在性过滤。
+/// 万一 shell 没有展开（旧系统或 Player 多选模型不生效）而得到字面量 `%*`，
+/// 过滤后为空，`parse` 会退回普通启动，而不是去压缩一个名为 `%*` 的文件。
 fn existing_paths(args: &[String]) -> Vec<PathBuf> {
-    args.iter()
-        .map(PathBuf::from)
+    reconstruct_paths(args)
+        .into_iter()
         .filter(|p| p.exists())
         .collect()
 }
@@ -52,13 +89,13 @@ pub fn parse() -> Startup {
             return Startup::CompressHere(existing_paths(&args[1..]));
         }
         "--extract-here" => {
-            if let Some(p) = args.get(1) {
-                return Startup::ExtractHere(PathBuf::from(p));
+            if let Some(p) = reconstruct_paths(&args[1..]).into_iter().next() {
+                return Startup::ExtractHere(p);
             }
         }
         "--extract-to" => {
-            if let Some(p) = args.get(1) {
-                return Startup::ExtractTo(PathBuf::from(p));
+            if let Some(p) = reconstruct_paths(&args[1..]).into_iter().next() {
+                return Startup::ExtractTo(p);
             }
         }
         other if !other.starts_with("--") => {
